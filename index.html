@@ -228,7 +228,6 @@
   /* SETS TABLE */
   .sets-header {
     display: grid;
-    grid-template-columns: 40px 1fr 1fr 1fr 100px;
     gap: 8px;
     padding: 12px 0 8px;
     font-family: 'Space Mono', monospace;
@@ -242,7 +241,6 @@
 
   .set-row {
     display: grid;
-    grid-template-columns: 40px 1fr 1fr 1fr 100px;
     gap: 8px;
     align-items: center;
     padding: 6px 0;
@@ -626,8 +624,6 @@
     main { padding: 16px; }
     header { padding: 14px 16px; }
     .tabs { padding: 0 16px; }
-    .sets-header, .set-row { grid-template-columns: 32px 1fr 1fr 80px; }
-    .sets-header .col-load, .set-row .col-load { display: none; }
   }
 </style>
 </head>
@@ -747,25 +743,18 @@
           <input type="text" class="form-input" id="newReps" placeholder="8 - 12">
         </div>
         <div class="form-group">
-          <label>Tempo (E-P-C-P)</label>
-          <input type="text" class="form-input" id="newTempo" placeholder="3-0-X-1">
-        </div>
-        <div class="form-group">
           <label>Descanso</label>
           <select class="form-select" id="newRest">
             <option value="60">60 seg</option>
             <option value="90">90 seg</option>
             <option value="120" selected>2 min</option>
+            <option value="150">2 min 30 seg</option>
             <option value="180">3 min</option>
             <option value="240">4 min</option>
           </select>
         </div>
         <div class="form-group">
-          <label>RIR</label>
-          <input type="text" class="form-input" id="newRIR" placeholder="1-2">
-        </div>
-        <div class="form-group">
-          <label>¿Requiere carga?</label>
+          <label>¿Requiere lastre?</label>
           <select class="form-select" id="newLoad">
             <option value="0">No</option>
             <option value="1">Sí</option>
@@ -868,20 +857,18 @@ function renderExercises() {
           <div class="exercise-meta">
             <span>SERIES <span>${ex.series}</span></span>
             <span>REPS <span>${ex.reps}</span></span>
-            <span>TEMPO <span>${ex.tempo || '–'}</span></span>
-            <span>RIR <span>${ex.rir}</span></span>
             <span>DESCANSO <span>${formatTime(ex.rest)}</span></span>
+            ${ex.hasLoad ? '<span>CARGA <span>✓</span></span>' : ''}
           </div>
         </div>
         <div class="exercise-pattern">${ex.pattern}</div>
         <div class="card-chevron">▾</div>
       </div>
       <div class="card-body">
-        <div class="sets-header">
+        <div class="sets-header" id="sh-${ex.id}" style="grid-template-columns: 40px 1fr ${ex.hasLoad ? '1fr ' : ''}44px;">
           <div>SET</div>
           <div>REPS</div>
-          <div class="col-load">CARGA (kg)</div>
-          <div>RIR</div>
+          ${ex.hasLoad ? '<div>CARGA (kg)</div>' : ''}
           <div style="text-align:center">✓</div>
         </div>
         <div id="sets-${ex.id}"></div>
@@ -898,7 +885,7 @@ function renderExercises() {
 }
 
 function initSets(ex) {
-  return Array.from({length: ex.series}, () => ({reps:'', load:'', rir:'', done: false}));
+  return Array.from({length: ex.series}, () => ({reps:'', load:'', done: false}));
 }
 
 function renderSets(exId) {
@@ -906,19 +893,18 @@ function renderSets(exId) {
   if (!container) return;
   const sets = sessionLog[exId] || [];
   container.innerHTML = '';
+  const ex = exercises.find(e => e.id === exId);
+  const cols = ex && ex.hasLoad ? '40px 1fr 1fr 44px' : '40px 1fr 44px';
   sets.forEach((set, i) => {
     const row = document.createElement('div');
     row.className = 'set-row';
-    const ex = exercises.find(e => e.id === exId);
+    row.style.gridTemplateColumns = cols;
     row.innerHTML = `
       <div class="set-num">${i+1}</div>
       <input class="set-input" type="number" min="0" placeholder="${ex ? ex.reps : '–'}"
         value="${set.reps}" onchange="updateSet('${exId}', ${i}, 'reps', this.value)">
-      <input class="set-input col-load" type="number" min="0" step="0.5" placeholder="${ex && ex.hasLoad ? 'kg' : '—'}"
-        ${ex && !ex.hasLoad ? 'readonly style="color:var(--muted);cursor:not-allowed;"' : ''}
-        value="${set.load}" onchange="updateSet('${exId}', ${i}, 'load', this.value)">
-      <input class="set-input" type="text" placeholder="${ex ? ex.rir : '–'}"
-        value="${set.rir}" onchange="updateSet('${exId}', ${i}, 'rir', this.value)">
+      ${ex && ex.hasLoad ? `<input class="set-input" type="number" min="0" step="0.5" placeholder="kg"
+        value="${set.load||''}" onchange="updateSet('${exId}', ${i}, 'load', this.value)">` : ''}
       <div style="display:flex; align-items:center; justify-content:center;">
         <button class="set-done-btn ${set.done ? 'completed' : ''}"
           onclick="toggleSetDone('${exId}', ${i})">
@@ -963,7 +949,7 @@ function toggleSetDone(exId, idx) {
 
 function addSet(exId) {
   if (!sessionLog[exId]) sessionLog[exId] = [];
-  sessionLog[exId].push({reps:'', load:'', rir:'', done: false});
+  sessionLog[exId].push({reps:'', load:'', done: false});
   renderSets(exId);
 }
 
@@ -1115,7 +1101,7 @@ function renderHistorial() {
         <div style="margin-bottom:8px;">
           <div style="font-weight:500; font-size:13px; margin-bottom:4px;">${e.name}</div>
           <div class="history-sets">
-            ${e.sets.map((s,i) => `<span>SET ${i+1}: <strong>${s.reps || '–'} reps</strong>${s.load ? ` · <strong>${s.load}kg</strong>` : ''}${s.rir ? ` · RIR ${s.rir}` : ''}</span>`).join(' &nbsp;|&nbsp; ')}
+            ${e.sets.map((s,i) => `<span>SET ${i+1}: <strong>${s.reps || '–'} reps</strong>${s.load ? ` · <strong>${s.load}kg</strong>` : ''}</span>`).join(' &nbsp;|&nbsp; ')}
           </div>
         </div>
       `).join('<div class="divider" style="margin:8px 0;"></div>')}
@@ -1402,29 +1388,99 @@ function renderManageList() {
   exercises.forEach((ex, idx) => {
     const div = document.createElement('div');
     div.className = 'manage-item fade-in';
+    div.style.flexDirection = 'column';
+    div.style.alignItems = 'stretch';
+    div.style.gap = '0';
     div.innerHTML = `
-      <div style="font-family:'Bebas Neue',sans-serif; font-size:24px; color:var(--muted); min-width:36px;">${idx+1}</div>
-      <div class="manage-item-info">
-        <div class="manage-item-name">${ex.name}</div>
-        <div class="manage-item-meta">
-          <span>${ex.pattern}</span>
-          <span>·</span>
-          <span>${ex.series} series</span>
-          <span>·</span>
-          <span>${ex.reps} reps</span>
-          <span>·</span>
-          <span>Descanso: ${formatTime(ex.rest)}</span>
-          ${ex.hasLoad ? '<span>· <span style="color:var(--accent)">CON CARGA</span></span>' : ''}
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="font-family:'Bebas Neue',sans-serif; font-size:24px; color:var(--muted); min-width:36px;">${idx+1}</div>
+        <div class="manage-item-info">
+          <div class="manage-item-name">${ex.name}</div>
+          <div class="manage-item-meta">
+            <span>${ex.pattern}</span>
+            <span>·</span>
+            <span>${ex.series} series</span>
+            <span>·</span>
+            <span>${ex.reps} reps</span>
+            <span>·</span>
+            <span>Descanso: ${formatTime(ex.rest)}</span>
+            ${ex.hasLoad ? '<span>· <span style="color:var(--accent)">CON LASTRE</span></span>' : ''}
+          </div>
+        </div>
+        <div style="display:flex; gap:6px; flex-shrink:0;">
+          ${idx > 0 ? `<button class="btn" style="padding:6px 10px;" onclick="moveExercise(${idx},-1)">↑</button>` : ''}
+          ${idx < exercises.length-1 ? `<button class="btn" style="padding:6px 10px;" onclick="moveExercise(${idx},1)">↓</button>` : ''}
+          <button class="btn" style="padding:6px 10px; border-color:#4fefff; color:#4fefff;" onclick="toggleEditPanel('edit-${ex.id}')">✎ EDITAR</button>
+          <button class="btn danger" style="padding:6px 10px;" onclick="removeExercise('${ex.id}')">✕</button>
         </div>
       </div>
-      <div style="display:flex; gap:6px;">
-        ${idx > 0 ? `<button class="btn" style="padding:6px 10px;" onclick="moveExercise(${idx},-1)">↑</button>` : ''}
-        ${idx < exercises.length-1 ? `<button class="btn" style="padding:6px 10px;" onclick="moveExercise(${idx},1)">↓</button>` : ''}
-        <button class="btn danger" style="padding:6px 10px;" onclick="removeExercise('${ex.id}')">✕</button>
+      <div id="edit-${ex.id}" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid var(--border);">
+        <div class="form-grid" style="margin-bottom:10px;">
+          <div class="form-group full">
+            <label>Nombre</label>
+            <input type="text" class="form-input" id="ename-${ex.id}" value="${ex.name}">
+          </div>
+          <div class="form-group">
+            <label>Patrón</label>
+            <select class="form-select" id="epattern-${ex.id}">
+              ${['Tracción Vertical','Tracción Horizontal','Empuje Vertical','Empuje Horizontal','Piernas','Core','Otro'].map(p =>
+                `<option ${ex.pattern === p ? 'selected' : ''}>${p}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Series</label>
+            <input type="number" class="form-input" id="eseries-${ex.id}" value="${ex.series}" min="1" max="10">
+          </div>
+          <div class="form-group">
+            <label>Reps</label>
+            <input type="text" class="form-input" id="ereps-${ex.id}" value="${ex.reps}">
+          </div>
+          <div class="form-group">
+            <label>Descanso</label>
+            <select class="form-select" id="erest-${ex.id}">
+              ${[['60','60 seg'],['90','90 seg'],['120','2 min'],['150','2 min 30 seg'],['180','3 min'],['240','4 min']].map(([v,l]) =>
+                `<option value="${v}" ${ex.rest == v ? 'selected' : ''}>${l}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>¿Requiere lastre?</label>
+            <select class="form-select" id="eload-${ex.id}">
+              <option value="0" ${!ex.hasLoad ? 'selected' : ''}>No</option>
+              <option value="1" ${ex.hasLoad ? 'selected' : ''}>Sí</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn primary" style="flex:1;" onclick="saveEdit('${ex.id}')">✓ GUARDAR CAMBIOS</button>
+          <button class="btn" onclick="toggleEditPanel('edit-${ex.id}')">CANCELAR</button>
+        </div>
       </div>
     `;
     container.appendChild(div);
   });
+}
+
+function toggleEditPanel(panelId) {
+  const panel = document.getElementById(panelId);
+  if (!panel) return;
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function saveEdit(exId) {
+  const idx = exercises.findIndex(e => e.id === exId);
+  if (idx === -1) return;
+  exercises[idx] = {
+    ...exercises[idx],
+    name: document.getElementById(`ename-${exId}`).value.trim() || exercises[idx].name,
+    pattern: document.getElementById(`epattern-${exId}`).value,
+    series: parseInt(document.getElementById(`eseries-${exId}`).value) || exercises[idx].series,
+    reps: document.getElementById(`ereps-${exId}`).value || exercises[idx].reps,
+    rest: parseInt(document.getElementById(`erest-${exId}`).value) || exercises[idx].rest,
+    hasLoad: document.getElementById(`eload-${exId}`).value === '1',
+  };
+  saveData('exercises', exercises);
+  renderManageList();
+  renderExercises();
 }
 
 function addExercise() {
@@ -1436,9 +1492,7 @@ function addExercise() {
     pattern: document.getElementById('newPattern').value,
     series: parseInt(document.getElementById('newSeries').value) || 3,
     reps: document.getElementById('newReps').value || '8 - 12',
-    tempo: document.getElementById('newTempo').value || '–',
     rest: parseInt(document.getElementById('newRest').value) || 120,
-    rir: document.getElementById('newRIR').value || '2',
     hasLoad: document.getElementById('newLoad').value === '1',
   };
   exercises.push(ex);
@@ -1446,7 +1500,7 @@ function addExercise() {
   renderManageList();
   renderExercises();
   // clear form
-  ['newName','newSeries','newReps','newTempo','newRIR'].forEach(id => document.getElementById(id).value = '');
+  ['newName','newSeries','newReps'].forEach(id => document.getElementById(id).value = '');
 }
 
 function removeExercise(id) {
