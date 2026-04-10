@@ -625,6 +625,67 @@
     header { padding: 14px 16px; }
     .tabs { padding: 0 16px; }
   }
+  /* Body tracking */
+  .body-entry {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px 16px;
+    margin-bottom: 8px;
+  }
+  .body-entry-date {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .body-measures {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .body-measure-chip {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 4px 10px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .body-measure-chip strong { color: var(--text); display: block; font-size: 13px; }
+  .photo-thumb {
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: border-color 0.15s;
+    width: 100%;
+  }
+  .photo-thumb:hover { border-color: var(--accent); }
+  .photo-date {
+    font-family: 'Space Mono', monospace;
+    font-size: 8px;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 4px;
+  }
+  .photo-lightbox {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.95);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 600;
+    cursor: pointer;
+  }
+  .photo-lightbox.visible { display: flex; }
+  .photo-lightbox img { max-width: 92vw; max-height: 88vh; border-radius: 4px; }
 </style>
 </head>
 <body>
@@ -707,6 +768,86 @@
       <div class="chart-title">Volumen total por sesión (series × reps)</div>
       <canvas id="volumeChart" height="160"></canvas>
     </div>
+
+    <!-- SEGUIMIENTO FÍSICO -->
+    <div style="margin-top:32px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+        <div>
+          <div style="font-family:'Bebas Neue',sans-serif; font-size:32px; letter-spacing:2px; line-height:1;">FÍSICO</div>
+          <div style="font-family:'Space Mono',monospace; font-size:10px; color:var(--muted); letter-spacing:1px;">peso · medidas · fotos</div>
+        </div>
+        <button class="btn primary" onclick="toggleBodyForm()">+ NUEVO REGISTRO</button>
+      </div>
+
+      <!-- Form -->
+      <div id="bodyForm" style="display:none;" class="add-exercise-form" style="margin-bottom:16px;">
+        <h3 style="margin-bottom:16px;">📏 REGISTRO FÍSICO</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Fecha</label>
+            <input type="date" class="form-input" id="bDate">
+          </div>
+          <div class="form-group">
+            <label>Peso corporal (kg)</label>
+            <input type="number" class="form-input" id="bWeight" step="0.1" placeholder="75.5">
+          </div>
+          <div class="form-group">
+            <label>Cintura (cm)</label>
+            <input type="number" class="form-input" id="bWaist" step="0.5" placeholder="80">
+          </div>
+          <div class="form-group">
+            <label>Pecho / Espalda (cm)</label>
+            <input type="number" class="form-input" id="bChest" step="0.5" placeholder="100">
+          </div>
+          <div class="form-group">
+            <label>Cadera (cm)</label>
+            <input type="number" class="form-input" id="bHip" step="0.5" placeholder="95">
+          </div>
+          <div class="form-group">
+            <label>Brazo superior (cm)</label>
+            <input type="number" class="form-input" id="bArm" step="0.5" placeholder="35">
+          </div>
+          <div class="form-group">
+            <label>Muslo (cm)</label>
+            <input type="number" class="form-input" id="bThigh" step="0.5" placeholder="55">
+          </div>
+          <div class="form-group full">
+            <label>Fotos (opcional — se guardan en el navegador)</label>
+            <input type="file" class="form-input" id="bPhotos" accept="image/*" multiple style="padding:6px;">
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:4px;">
+          <button class="btn primary" style="flex:1;" onclick="saveBodyStat()">✓ GUARDAR</button>
+          <button class="btn" onclick="toggleBodyForm()">CANCELAR</button>
+        </div>
+      </div>
+
+      <!-- Body charts -->
+      <div class="chart-container" id="bodyChartContainer" style="display:none;">
+        <div style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;">
+          <button class="btn active-metric" id="metricBtn-weight" onclick="setBodyMetric('weight',this)" style="font-size:9px; padding:6px 12px; border-color:var(--accent); color:var(--accent);">PESO</button>
+          <button class="btn" id="metricBtn-waist" onclick="setBodyMetric('waist',this)" style="font-size:9px; padding:6px 12px;">CINTURA</button>
+          <button class="btn" id="metricBtn-chest" onclick="setBodyMetric('chest',this)" style="font-size:9px; padding:6px 12px;">PECHO</button>
+          <button class="btn" id="metricBtn-hip" onclick="setBodyMetric('hip',this)" style="font-size:9px; padding:6px 12px;">CADERA</button>
+          <button class="btn" id="metricBtn-arm" onclick="setBodyMetric('arm',this)" style="font-size:9px; padding:6px 12px;">BRAZO</button>
+          <button class="btn" id="metricBtn-thigh" onclick="setBodyMetric('thigh',this)" style="font-size:9px; padding:6px 12px;">MUSLO</button>
+        </div>
+        <div class="chart-title" id="bodyChartTitle">EVOLUCIÓN DEL PESO</div>
+        <canvas id="bodyChart" height="180"></canvas>
+      </div>
+
+      <!-- Stats row -->
+      <div class="stats-grid" id="bodyStatsGrid" style="margin-bottom:16px;"></div>
+
+      <!-- Photo gallery -->
+      <div id="photoGallery" style="display:none;">
+        <div style="font-family:'Space Mono',monospace; font-size:10px; letter-spacing:2px; color:var(--muted); text-transform:uppercase; margin-bottom:12px;">FOTOS DE PROGRESIÓN</div>
+        <div id="photoGrid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap:8px;"></div>
+      </div>
+
+      <!-- History entries -->
+      <div id="bodyHistoryList"></div>
+    </div>
   </section>
 
   <!-- ===== GESTIÓN ===== -->
@@ -772,12 +913,12 @@
 // DATA & STATE
 // ============================================================
 const DEFAULT_EXERCISES = [
-  { id: 'ex1', name: 'Dominadas (Estrictas/Lastradas)', pattern: 'Tracción Vertical', series: 4, reps: '6 - 10', tempo: '3-0-X-1', rest: 180, rir: '1-2', hasLoad: true },
-  { id: 'ex2', name: 'Archer Push-ups', pattern: 'Empuje Horizontal', series: 4, reps: '8 - 12', tempo: '3-1-X-0', rest: 120, rir: '2', hasLoad: false },
-  { id: 'ex3', name: 'Remos en Anillas (Cuerpo paralelo)', pattern: 'Tracción Horizontal', series: 4, reps: '8 - 12', tempo: '2-1-2-1', rest: 90, rir: '2', hasLoad: false },
-  { id: 'ex4', name: 'Pike Push-ups (Elevados)', pattern: 'Empuje Vertical', series: 4, reps: '6 - 10', tempo: '3-1-X-0', rest: 120, rir: '1-2', hasLoad: false },
-  { id: 'ex5', name: 'Sentadillas Búlgaras', pattern: 'Piernas', series: 4, reps: '8 - 10 (c/l)', tempo: '3-0-X-1', rest: 120, rir: '2', hasLoad: true },
-  { id: 'ex6', name: 'Leg Raises en Barra (Sin balanceo)', pattern: 'Core', series: 3, reps: '10 - 15', tempo: '2-0-2-2', rest: 60, rir: '2', hasLoad: false },
+  { id: 'ex1', name: 'Dominadas (Estrictas/Lastradas)', pattern: 'Tracción Vertical', series: 4, reps: '6 - 10', rest: 180, hasLoad: true, active: true },
+  { id: 'ex2', name: 'Archer Push-ups', pattern: 'Empuje Horizontal', series: 4, reps: '8 - 12', rest: 120, hasLoad: false, active: true },
+  { id: 'ex3', name: 'Remos en Anillas (Cuerpo paralelo)', pattern: 'Tracción Horizontal', series: 4, reps: '8 - 12', rest: 90, hasLoad: false, active: true },
+  { id: 'ex4', name: 'Pike Push-ups (Elevados)', pattern: 'Empuje Vertical', series: 4, reps: '6 - 10', rest: 120, hasLoad: false, active: true },
+  { id: 'ex5', name: 'Sentadillas Búlgaras', pattern: 'Piernas', series: 4, reps: '8 - 10 (c/l)', rest: 120, hasLoad: true, active: true },
+  { id: 'ex6', name: 'Leg Raises en Barra (Sin balanceo)', pattern: 'Core', series: 3, reps: '10 - 15', rest: 60, hasLoad: false, active: true },
 ];
 
 function loadData(key, fallback) {
@@ -788,8 +929,11 @@ function saveData(key, value) {
 }
 
 let exercises = loadData('exercises', DEFAULT_EXERCISES);
+// Migrate old exercises that don't have active flag
+exercises = exercises.map(e => ({ active: true, ...e }));
 let sessionLog = {}; // { exId: [ {reps, load, done}, ... ] }
 let history = loadData('history', []); // [ { date, entries: [{exId, name, sets:[{reps,load}]}] } ]
+let bodyStats = loadData('bodyStats', []); // [ { date, weight, waist, chest, hip, arm, thigh, photos:[] } ]
 let progressView = 'week';
 
 // TIMER STATE
@@ -811,6 +955,7 @@ function init() {
   renderGlobalStats();
   renderVolumeChart();
   populateProgressSelect();
+  renderBodySection();
 }
 
 function updateHeaderDate() {
@@ -831,7 +976,7 @@ function switchTab(name) {
   const tabs = document.querySelectorAll('.tab');
   const idx = ['entrenamiento','historial','progresion','gestion'].indexOf(name);
   tabs[idx].classList.add('active');
-  if (name === 'progresion') { renderGlobalStats(); renderVolumeChart(); populateProgressSelect(); renderProgressChart(); }
+  if (name === 'progresion') { renderGlobalStats(); renderVolumeChart(); populateProgressSelect(); renderProgressChart(); renderBodySection(); }
   if (name === 'historial') renderHistorial();
   if (name === 'gestion') renderManageList();
 }
@@ -842,7 +987,12 @@ function switchTab(name) {
 function renderExercises() {
   const container = document.getElementById('exerciseList');
   container.innerHTML = '';
-  exercises.forEach((ex, idx) => {
+  const active = exercises.filter(ex => ex.active !== false);
+  if (!active.length) {
+    container.innerHTML = '<div class="empty-state"><div>⚡</div>No hay ejercicios activos.<br>Actívalos en el apartado Ejercicios.</div>';
+    return;
+  }
+  active.forEach((ex, idx) => {
     const logSets = sessionLog[ex.id] || initSets(ex);
     sessionLog[ex.id] = logSets;
     const allDone = logSets.every(s => s.done);
@@ -1382,35 +1532,64 @@ function drawBarChart(ctx, canvas, labels, values) {
 // ============================================================
 // GESTIÓN
 // ============================================================
+function toggleActive(exId) {
+  const idx = exercises.findIndex(e => e.id === exId);
+  if (idx === -1) return;
+  exercises[idx].active = !exercises[idx].active;
+  saveData('exercises', exercises);
+  renderManageList();
+  renderExercises();
+}
+
 function renderManageList() {
   const container = document.getElementById('manageList');
   container.innerHTML = '';
-  exercises.forEach((ex, idx) => {
+
+  // Split into active and inactive
+  const active = exercises.filter(e => e.active !== false);
+  const inactive = exercises.filter(e => e.active === false);
+  const sorted = [...active, ...inactive];
+
+  if (!sorted.length) {
+    container.innerHTML = '<div class="empty-state"><div>🏋️</div>No hay ejercicios. Añade el primero.</div>';
+    return;
+  }
+
+  sorted.forEach((ex) => {
+    const idx = exercises.indexOf(ex);
+    const isActive = ex.active !== false;
     const div = document.createElement('div');
     div.className = 'manage-item fade-in';
     div.style.flexDirection = 'column';
     div.style.alignItems = 'stretch';
     div.style.gap = '0';
+    div.style.opacity = isActive ? '1' : '0.5';
+    div.style.borderColor = isActive ? '' : 'var(--border)';
     div.innerHTML = `
       <div style="display:flex; align-items:center; gap:12px;">
-        <div style="font-family:'Bebas Neue',sans-serif; font-size:24px; color:var(--muted); min-width:36px;">${idx+1}</div>
+        <div style="font-family:'Bebas Neue',sans-serif; font-size:22px; color:${isActive ? 'var(--accent)' : 'var(--muted)'}; min-width:36px; line-height:1;">
+          ${isActive ? '●' : '○'}
+        </div>
         <div class="manage-item-info">
-          <div class="manage-item-name">${ex.name}</div>
+          <div class="manage-item-name" style="color:${isActive ? 'var(--text)' : 'var(--muted)'};">${ex.name}
+            ${isActive ? '<span class="tag green" style="margin-left:6px;">ACTIVO</span>' : '<span class="tag" style="margin-left:6px;background:rgba(102,102,102,0.15);color:var(--muted);border:1px solid var(--border);">INACTIVO</span>'}
+          </div>
           <div class="manage-item-meta">
             <span>${ex.pattern}</span>
             <span>·</span>
-            <span>${ex.series} series</span>
-            <span>·</span>
-            <span>${ex.reps} reps</span>
+            <span>${ex.series} series · ${ex.reps} reps</span>
             <span>·</span>
             <span>Descanso: ${formatTime(ex.rest)}</span>
-            ${ex.hasLoad ? '<span>· <span style="color:var(--accent)">CON LASTRE</span></span>' : ''}
+            ${ex.hasLoad ? '<span>· <span style="color:var(--accent)">CON CARGA</span></span>' : ''}
           </div>
         </div>
-        <div style="display:flex; gap:6px; flex-shrink:0;">
-          ${idx > 0 ? `<button class="btn" style="padding:6px 10px;" onclick="moveExercise(${idx},-1)">↑</button>` : ''}
-          ${idx < exercises.length-1 ? `<button class="btn" style="padding:6px 10px;" onclick="moveExercise(${idx},1)">↓</button>` : ''}
-          <button class="btn" style="padding:6px 10px; border-color:#4fefff; color:#4fefff;" onclick="toggleEditPanel('edit-${ex.id}')">✎ EDITAR</button>
+        <div style="display:flex; gap:6px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end;">
+          ${isActive && exercises.filter(e=>e.active!==false).indexOf(ex) > 0 ? `<button class="btn" style="padding:6px 10px;" onclick="moveExercise(${idx},-1)">↑</button>` : ''}
+          ${isActive && exercises.filter(e=>e.active!==false).indexOf(ex) < exercises.filter(e=>e.active!==false).length-1 ? `<button class="btn" style="padding:6px 10px;" onclick="moveExercise(${idx},1)">↓</button>` : ''}
+          <button class="btn" style="padding:6px 10px; ${isActive ? 'border-color:var(--success);color:var(--success);' : 'border-color:var(--accent);color:var(--accent);'}" onclick="toggleActive('${ex.id}')">
+            ${isActive ? '⏸ DESACTIVAR' : '▶ ACTIVAR'}
+          </button>
+          <button class="btn" style="padding:6px 10px; border-color:#4fefff; color:#4fefff;" onclick="toggleEditPanel('edit-${ex.id}')">✎</button>
           <button class="btn danger" style="padding:6px 10px;" onclick="removeExercise('${ex.id}')">✕</button>
         </div>
       </div>
@@ -1443,7 +1622,7 @@ function renderManageList() {
             </select>
           </div>
           <div class="form-group">
-            <label>¿Requiere lastre?</label>
+            <label>¿Requiere carga?</label>
             <select class="form-select" id="eload-${ex.id}">
               <option value="0" ${!ex.hasLoad ? 'selected' : ''}>No</option>
               <option value="1" ${ex.hasLoad ? 'selected' : ''}>Sí</option>
@@ -1521,9 +1700,255 @@ function moveExercise(idx, dir) {
 }
 
 // ============================================================
+// BODY TRACKING
+// ============================================================
+let currentBodyMetric = 'weight';
+const metricLabels = { weight:'Peso (kg)', waist:'Cintura (cm)', chest:'Pecho/Espalda (cm)', hip:'Cadera (cm)', arm:'Brazo (cm)', thigh:'Muslo (cm)' };
+
+function toggleBodyForm() {
+  const f = document.getElementById('bodyForm');
+  const visible = f.style.display === 'none';
+  f.style.display = visible ? 'block' : 'none';
+  if (visible) {
+    // set today's date
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('bDate').value = today;
+  }
+}
+
+async function saveBodyStat() {
+  const dateVal = document.getElementById('bDate').value;
+  if (!dateVal) { alert('Indica la fecha.'); return; }
+
+  const entry = {
+    id: 'bs_' + Date.now(),
+    date: new Date(dateVal + 'T12:00:00').toISOString(),
+    weight: parseFloat(document.getElementById('bWeight').value) || null,
+    waist:  parseFloat(document.getElementById('bWaist').value)  || null,
+    chest:  parseFloat(document.getElementById('bChest').value)  || null,
+    hip:    parseFloat(document.getElementById('bHip').value)    || null,
+    arm:    parseFloat(document.getElementById('bArm').value)    || null,
+    thigh:  parseFloat(document.getElementById('bThigh').value)  || null,
+    photos: [],
+  };
+
+  // Read photos as base64
+  const files = document.getElementById('bPhotos').files;
+  if (files.length) {
+    const reads = Array.from(files).map(f => new Promise(res => {
+      const r = new FileReader();
+      r.onload = () => res(r.result);
+      r.readAsDataURL(f);
+    }));
+    entry.photos = await Promise.all(reads);
+  }
+
+  bodyStats.unshift(entry);
+  saveData('bodyStats', bodyStats);
+  toggleBodyForm();
+  // clear inputs
+  ['bWeight','bWaist','bChest','bHip','bArm','bThigh'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('bPhotos').value = '';
+  renderBodySection();
+}
+
+function deleteBodyStat(id) {
+  if (!confirm('¿Eliminar este registro?')) return;
+  bodyStats = bodyStats.filter(e => e.id !== id);
+  saveData('bodyStats', bodyStats);
+  renderBodySection();
+}
+
+function setBodyMetric(metric, btn) {
+  currentBodyMetric = metric;
+  document.querySelectorAll('[id^="metricBtn-"]').forEach(b => {
+    b.style.borderColor = 'var(--border)';
+    b.style.color = 'var(--text)';
+  });
+  btn.style.borderColor = 'var(--accent)';
+  btn.style.color = 'var(--accent)';
+  document.getElementById('bodyChartTitle').textContent = 'EVOLUCIÓN — ' + metricLabels[metric].toUpperCase();
+  renderBodyChart();
+}
+
+function renderBodySection() {
+  const hasSome = bodyStats.length > 0;
+  document.getElementById('bodyChartContainer').style.display = hasSome ? 'block' : 'none';
+  document.getElementById('photoGallery').style.display = hasSome ? 'block' : 'none';
+
+  renderBodyStatsGrid();
+  renderBodyChart();
+  renderPhotoGallery();
+  renderBodyHistory();
+}
+
+function renderBodyStatsGrid() {
+  const container = document.getElementById('bodyStatsGrid');
+  if (!bodyStats.length) { container.innerHTML = ''; return; }
+  const latest = bodyStats[0];
+  const prev = bodyStats[1] || null;
+  const metrics = [
+    { key:'weight', label:'Peso', unit:'kg' },
+    { key:'waist',  label:'Cintura', unit:'cm' },
+    { key:'chest',  label:'Pecho', unit:'cm' },
+    { key:'arm',    label:'Brazo', unit:'cm' },
+    { key:'hip',    label:'Cadera', unit:'cm' },
+    { key:'thigh',  label:'Muslo', unit:'cm' },
+  ];
+  container.innerHTML = metrics.filter(m => latest[m.key] !== null && latest[m.key] !== undefined).map(m => {
+    const val = latest[m.key];
+    const diff = prev && prev[m.key] != null ? (val - prev[m.key]).toFixed(1) : null;
+    const diffColor = diff === null ? '' : (parseFloat(diff) > 0 ? 'color:var(--accent2)' : 'color:var(--success)');
+    const sign = diff !== null && parseFloat(diff) > 0 ? '+' : '';
+    return `<div class="stat-box">
+      <label>${m.label}</label>
+      <div class="stat-value" style="font-size:26px;">${val}<span class="stat-unit">${m.unit}</span></div>
+      ${diff !== null ? `<div style="font-family:'Space Mono',monospace;font-size:10px;${diffColor};margin-top:4px;">${sign}${diff} vs anterior</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function renderBodyChart() {
+  const canvas = document.getElementById('bodyChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const sorted = [...bodyStats].reverse();
+  const labels = sorted.map(e => new Date(e.date).toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit'}));
+  const values = sorted.map(e => e[currentBodyMetric] || null);
+
+  // Filter out nulls
+  const validPairs = labels.map((l,i) => ({l, v: values[i]})).filter(p => p.v !== null);
+  drawBodyLine(ctx, canvas, validPairs.map(p=>p.l), validPairs.map(p=>p.v), metricLabels[currentBodyMetric]);
+}
+
+function drawBodyLine(ctx, canvas, labels, values, yLabel) {
+  const W = canvas.offsetWidth || 700;
+  const H = 180;
+  canvas.width = W * window.devicePixelRatio;
+  canvas.height = H * window.devicePixelRatio;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  ctx.clearRect(0,0,W,H);
+
+  if (!labels.length) {
+    ctx.fillStyle='#666'; ctx.font='12px Space Mono,monospace'; ctx.textAlign='center';
+    ctx.fillText('Sin datos', W/2, H/2); return;
+  }
+
+  const pad = {top:20,right:20,bottom:36,left:50};
+  const cW = W-pad.left-pad.right, cH = H-pad.top-pad.bottom;
+  const minV = Math.min(...values)*0.98, maxV = Math.max(...values)*1.02;
+
+  for (let i=0;i<=4;i++) {
+    const y = pad.top + cH - (i/4)*cH;
+    ctx.strokeStyle='#1c1c1c'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(pad.left,y); ctx.lineTo(pad.left+cW,y); ctx.stroke();
+    ctx.fillStyle='#444'; ctx.font='9px Space Mono,monospace'; ctx.textAlign='right';
+    ctx.fillText((minV + (maxV-minV)*i/4).toFixed(1), pad.left-4, y+3);
+  }
+
+  const step = labels.length > 10 ? Math.ceil(labels.length/8) : 1;
+  labels.forEach((l,i) => {
+    if (i%step!==0) return;
+    const x = pad.left + (i/(labels.length-1||1))*cW;
+    ctx.fillStyle='#444'; ctx.font='9px Space Mono,monospace'; ctx.textAlign='center';
+    ctx.fillText(l, x, H-pad.bottom+16);
+  });
+
+  // Area fill
+  ctx.beginPath();
+  values.forEach((v,i) => {
+    const x = pad.left + (i/(labels.length-1||1))*cW;
+    const y = pad.top + cH - ((v-minV)/(maxV-minV||1))*cH;
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  });
+  ctx.lineTo(pad.left+(labels.length-1)/(labels.length-1||1)*cW, pad.top+cH);
+  ctx.lineTo(pad.left, pad.top+cH);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0,pad.top,0,pad.top+cH);
+  grad.addColorStop(0,'rgba(232,255,79,0.15)');
+  grad.addColorStop(1,'rgba(232,255,79,0)');
+  ctx.fillStyle=grad; ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  ctx.strokeStyle='#e8ff4f'; ctx.lineWidth=2;
+  ctx.shadowColor='#e8ff4f'; ctx.shadowBlur=6;
+  values.forEach((v,i) => {
+    const x = pad.left + (i/(labels.length-1||1))*cW;
+    const y = pad.top + cH - ((v-minV)/(maxV-minV||1))*cH;
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  });
+  ctx.stroke(); ctx.shadowBlur=0;
+
+  // Dots
+  values.forEach((v,i) => {
+    const x = pad.left + (i/(labels.length-1||1))*cW;
+    const y = pad.top + cH - ((v-minV)/(maxV-minV||1))*cH;
+    ctx.fillStyle='#e8ff4f'; ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill();
+  });
+}
+
+function renderPhotoGallery() {
+  const grid = document.getElementById('photoGrid');
+  const allPhotos = [];
+  [...bodyStats].reverse().forEach(e => {
+    (e.photos||[]).forEach(src => {
+      allPhotos.push({ src, date: new Date(e.date).toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'2-digit'}) });
+    });
+  });
+  document.getElementById('photoGallery').style.display = allPhotos.length ? 'block' : 'none';
+  grid.innerHTML = allPhotos.map(p => `
+    <div>
+      <img class="photo-thumb" src="${p.src}" alt="progresión" onclick="openLightbox('${p.src}')">
+      <div class="photo-date">${p.date}</div>
+    </div>
+  `).join('');
+}
+
+function openLightbox(src) {
+  document.getElementById('lightboxImg').src = src;
+  document.getElementById('photoLightbox').classList.add('visible');
+}
+
+function renderBodyHistory() {
+  const container = document.getElementById('bodyHistoryList');
+  if (!bodyStats.length) {
+    container.innerHTML = '<div class="empty-state"><div>📏</div>Añade tu primer registro físico.</div>';
+    return;
+  }
+  container.innerHTML = bodyStats.map(e => {
+    const d = new Date(e.date);
+    const dateStr = d.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+    const chips = [
+      e.weight != null && `<div class="body-measure-chip"><strong>${e.weight} kg</strong>Peso</div>`,
+      e.waist  != null && `<div class="body-measure-chip"><strong>${e.waist} cm</strong>Cintura</div>`,
+      e.chest  != null && `<div class="body-measure-chip"><strong>${e.chest} cm</strong>Pecho</div>`,
+      e.hip    != null && `<div class="body-measure-chip"><strong>${e.hip} cm</strong>Cadera</div>`,
+      e.arm    != null && `<div class="body-measure-chip"><strong>${e.arm} cm</strong>Brazo</div>`,
+      e.thigh  != null && `<div class="body-measure-chip"><strong>${e.thigh} cm</strong>Muslo</div>`,
+    ].filter(Boolean).join('');
+    const thumbs = (e.photos||[]).slice(0,3).map(src =>
+      `<img src="${src}" style="width:48px;height:48px;object-fit:cover;border-radius:2px;border:1px solid var(--border);cursor:pointer;" onclick="openLightbox('${src}')">`
+    ).join('');
+    return `<div class="body-entry fade-in">
+      <div class="body-entry-date">
+        <span>📅 ${dateStr}</span>
+        <button class="btn danger" style="font-size:9px;padding:3px 8px;" onclick="deleteBodyStat('${e.id}')">✕</button>
+      </div>
+      <div class="body-measures">${chips}</div>
+      ${thumbs ? `<div style="display:flex;gap:6px;margin-top:10px;">${thumbs}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
 // START
 // ============================================================
 init();
 </script>
+<div class="photo-lightbox" id="photoLightbox" onclick="this.classList.remove('visible')">
+  <img id="lightboxImg" src="" alt="Foto progresión">
+</div>
+
 </body>
 </html>
