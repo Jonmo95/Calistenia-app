@@ -740,10 +740,6 @@
   <section id="progresion" class="section">
     <div class="progress-header">
       <div class="progress-title">PROGRESIÓN</div>
-      <div class="view-toggle">
-        <button class="active" onclick="setProgressView('week', this)">SEMANAL</button>
-        <button onclick="setProgressView('month', this)">MENSUAL</button>
-      </div>
     </div>
 
     <div class="stats-grid" id="globalStats"></div>
@@ -1336,18 +1332,106 @@ function deleteSession(idx) {
 function editSession(idx) {
   const s = history[idx];
   if (!s) return;
+  document.getElementById('editSessionIdx').value = idx;
+  // Set date
   const d = new Date(s.date);
-  const newDateStr = prompt('Editar fecha (DD/MM/AAAA):', d.toLocaleDateString('es-ES'));
-  if (!newDateStr) return;
-  const parts = newDateStr.split('/');
-  if (parts.length !== 3) { alert('Formato incorrecto. Usa DD/MM/AAAA'); return; }
-  const newDate = new Date(+parts[2], +parts[1]-1, +parts[0], d.getHours(), d.getMinutes());
-  if (isNaN(newDate)) { alert('Fecha inválida.'); return; }
-  history[idx].date = newDate.toISOString();
+  document.getElementById('editSessionDate').value = d.toISOString().split('T')[0];
+
+  // Build exercises editor
+  const container = document.getElementById('editSessionExercises');
+  container.innerHTML = s.entries.map((entry, ei) => {
+    const ex = exercises.find(e => e.id === entry.exId);
+    const hasLoad = ex ? ex.hasLoad : entry.sets.some(st => st.load);
+    const setsHTML = entry.sets.map((set, si) => {
+      const cols = hasLoad ? '32px 1fr 1fr 32px' : '32px 1fr 32px';
+      return `<div style="display:grid; grid-template-columns:${cols}; gap:6px; align-items:center; margin-bottom:4px;">
+        <div style="font-family:'Space Mono',monospace; font-size:11px; color:var(--muted); text-align:center;">${si+1}</div>
+        <input class="set-input" type="number" min="0" placeholder="reps"
+          value="${set.reps||''}" id="es-${ei}-${si}-reps">
+        ${hasLoad ? `<input class="set-input" type="number" min="0" step="0.5" placeholder="kg"
+          value="${set.load||''}" id="es-${ei}-${si}-load">` : ''}
+        <button onclick="removeEditSet(${ei},${si})" style="background:none;border:none;color:var(--danger);font-size:16px;cursor:pointer;padding:0;">✕</button>
+      </div>`;
+    }).join('');
+
+    const colHeader = hasLoad ? '32px 1fr 1fr 32px' : '32px 1fr 32px';
+    return `<div style="background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:14px; margin-bottom:12px;" id="editEntry-${ei}">
+      <div style="font-weight:600; font-size:14px; margin-bottom:10px;">${entry.name}</div>
+      <div style="display:grid; grid-template-columns:${colHeader}; gap:6px; font-family:'Space Mono',monospace; font-size:9px; letter-spacing:1px; color:var(--muted); text-transform:uppercase; margin-bottom:6px; padding-bottom:6px; border-bottom:1px solid var(--border);">
+        <div style="text-align:center">#</div><div>REPS</div>${hasLoad ? '<div>CARGA (kg)</div>' : ''}<div></div>
+      </div>
+      <div id="editSets-${ei}">${setsHTML}</div>
+      <button class="btn" style="font-size:9px; padding:5px 10px; margin-top:8px;" onclick="addEditSet(${ei}, ${hasLoad})">+ SERIE</button>
+    </div>`;
+  }).join('');
+
+  document.getElementById('sessionEditOverlay').style.display = 'flex';
+}
+
+// Live add/remove sets inside session edit modal
+let _editSessionRef = null;
+function addEditSet(ei, hasLoad) {
+  const idx = parseInt(document.getElementById('editSessionIdx').value);
+  const s = history[idx];
+  if (!s) return;
+  s.entries[ei].sets.push({ reps: '', load: '', done: true });
+  // re-render just this exercise's sets
+  const container = document.getElementById(`editSets-${ei}`);
+  const entry = s.entries[ei];
+  const ex = exercises.find(e => e.id === entry.exId);
+  const hL = ex ? ex.hasLoad : entry.sets.some(st => st.load);
+  container.innerHTML = entry.sets.map((set, si) => {
+    const cols = hL ? '32px 1fr 1fr 32px' : '32px 1fr 32px';
+    return `<div style="display:grid; grid-template-columns:${cols}; gap:6px; align-items:center; margin-bottom:4px;">
+      <div style="font-family:'Space Mono',monospace; font-size:11px; color:var(--muted); text-align:center;">${si+1}</div>
+      <input class="set-input" type="number" min="0" placeholder="reps" value="${set.reps||''}" id="es-${ei}-${si}-reps">
+      ${hL ? `<input class="set-input" type="number" min="0" step="0.5" placeholder="kg" value="${set.load||''}" id="es-${ei}-${si}-load">` : ''}
+      <button onclick="removeEditSet(${ei},${si})" style="background:none;border:none;color:var(--danger);font-size:16px;cursor:pointer;padding:0;">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function removeEditSet(ei, si) {
+  const idx = parseInt(document.getElementById('editSessionIdx').value);
+  const s = history[idx];
+  if (!s || s.entries[ei].sets.length <= 1) return;
+  s.entries[ei].sets.splice(si, 1);
+  addEditSet(ei, false); // re-render (hasLoad will be re-detected)
+}
+
+function saveSessionEdit() {
+  const idx = parseInt(document.getElementById('editSessionIdx').value);
+  const s = history[idx];
+  if (!s) return;
+
+  // Save date
+  const dateVal = document.getElementById('editSessionDate').value;
+  if (dateVal) {
+    const orig = new Date(s.date);
+    const nd = new Date(dateVal + 'T' + orig.toTimeString().slice(0,5));
+    if (!isNaN(nd)) s.date = nd.toISOString();
+  }
+
+  // Save sets from inputs
+  s.entries.forEach((entry, ei) => {
+    entry.sets.forEach((set, si) => {
+      const repsEl = document.getElementById(`es-${ei}-${si}-reps`);
+      const loadEl = document.getElementById(`es-${ei}-${si}-load`);
+      if (repsEl) set.reps = repsEl.value;
+      if (loadEl) set.load = loadEl.value;
+    });
+  });
+
   history.sort((a, b) => new Date(b.date) - new Date(a.date));
   saveData('history', history);
+  closeSessionEdit();
   renderGlobalStats();
   populateProgressSelect();
+  renderProgressChart();
+}
+
+function closeSessionEdit() {
+  document.getElementById('sessionEditOverlay').style.display = 'none';
 }
 
 function populateProgressSelect() {
@@ -1367,25 +1451,16 @@ function populateProgressSelect() {
 }
 
 function getFilteredHistory() {
-  if (!history.length) return [];
-  const now = new Date();
-  return history.filter(s => {
-    const d = new Date(s.date);
-    if (progressView === 'week') {
-      const diff = (now - d) / (1000 * 60 * 60 * 24);
-      return diff <= 28; // last 4 weeks
-    } else {
-      const diff = (now - d) / (1000 * 60 * 60 * 24);
-      return diff <= 365;
-    }
-  });
+  // Return all history sorted oldest→newest for charting
+  return [...history].sort((a, b) => new Date(a.date) - new Date(b.date));
 }
 
 function renderProgressChart() {
   const canvas = document.getElementById('progressChart');
   const ctx = canvas.getContext('2d');
   const exName = document.getElementById('progressExerciseSelect').value;
-  const filtered = getFilteredHistory().reverse();
+  // Already sorted oldest→newest by getFilteredHistory
+  const filtered = getFilteredHistory();
 
   const labels = [];
   const maxReps = [];
@@ -1398,7 +1473,8 @@ function renderProgressChart() {
     const d = new Date(s.date);
     labels.push(d.toLocaleDateString('es-ES', {day:'2-digit', month:'2-digit'}));
     const reps = entry.sets.map(st => parseInt(st.reps) || 0);
-    maxReps.push(Math.max(...reps, 0));
+    const validReps = reps.filter(r => r > 0);
+    maxReps.push(validReps.length ? Math.max(...validReps) : 0);
     totalVol.push(reps.reduce((a,b) => a+b, 0));
     const loads = entry.sets.map(st => parseFloat(st.load) || 0).filter(l => l > 0);
     avgLoad.push(loads.length ? +(loads.reduce((a,b)=>a+b,0)/loads.length).toFixed(1) : 0);
@@ -2129,6 +2205,24 @@ function renderBodyHistory() {
 // ============================================================
 init();
 </script>
+<!-- SESSION EDIT MODAL -->
+<div id="sessionEditOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.92); z-index:400; align-items:flex-start; justify-content:center; padding:20px; overflow-y:auto;">
+  <div style="background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:24px; width:100%; max-width:640px; margin:auto;">
+    <h3 style="font-family:'Bebas Neue',sans-serif; font-size:24px; letter-spacing:2px; color:var(--accent); margin-bottom:4px;">✎ EDITAR SESIÓN</h3>
+    <div style="font-family:'Space Mono',monospace; font-size:10px; color:var(--muted); margin-bottom:20px;">Modifica fecha, series, reps y carga</div>
+    <input type="hidden" id="editSessionIdx">
+    <div class="form-group" style="margin-bottom:20px;">
+      <label style="font-family:'Space Mono',monospace; font-size:9px; letter-spacing:2px; text-transform:uppercase; color:var(--muted);">Fecha</label>
+      <input type="date" class="form-input" id="editSessionDate" style="margin-top:6px;">
+    </div>
+    <div id="editSessionExercises"></div>
+    <div style="display:flex; gap:8px; margin-top:20px;">
+      <button class="btn primary" style="flex:1;" onclick="saveSessionEdit()">✓ GUARDAR SESIÓN</button>
+      <button class="btn" onclick="closeSessionEdit()">CANCELAR</button>
+    </div>
+  </div>
+</div>
+
 <!-- BODY STAT EDIT MODAL -->
 <div id="bodyEditOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:400; align-items:center; justify-content:center; padding:20px;">
   <div style="background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:24px; width:100%; max-width:500px; max-height:90vh; overflow-y:auto;">
