@@ -754,6 +754,13 @@
       <canvas id="progressChart" height="200"></canvas>
     </div>
 
+    <!-- SESIONES REGISTRADAS -->
+    <div style="margin-bottom:32px;">
+      <div style="font-family:'Bebas Neue',sans-serif; font-size:32px; letter-spacing:2px; line-height:1; margin-bottom:4px;">SESIONES</div>
+      <div style="font-family:'Space Mono',monospace; font-size:10px; color:var(--muted); letter-spacing:1px; margin-bottom:14px;">historial de entrenamientos</div>
+      <div id="sessionHistoryList"></div>
+    </div>
+
     <!-- SEGUIMIENTO FÍSICO -->
     <div style="margin-top:32px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
@@ -1125,6 +1132,7 @@ function finishSession() {
   sessionLog = {};
   renderExercises();
   updateHeaderDate();
+  renderSessionHistory();
 }
 
 // ============================================================
@@ -1284,6 +1292,62 @@ function renderGlobalStats() {
       <div class="stat-value">${exercises.length}<span class="stat-unit">ejerc.</span></div>
     </div>
   `;
+  renderSessionHistory();
+}
+
+function renderSessionHistory() {
+  const container = document.getElementById('sessionHistoryList');
+  if (!container) return;
+  if (!history.length) {
+    container.innerHTML = '<div class="empty-state" style="padding:24px;"><div>⚡</div>No hay sesiones guardadas aún.</div>';
+    return;
+  }
+  container.innerHTML = history.map((s, idx) => {
+    const d = new Date(s.date);
+    const dateStr = d.toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+    const timeStr = d.toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' });
+    const totalSets = s.entries.reduce((a, e) => a + e.sets.length, 0);
+    return `<div class="body-entry fade-in" style="display:flex; align-items:center; gap:12px;">
+      <div style="flex:1;">
+        <div style="font-family:'Space Mono',monospace; font-size:11px; color:var(--accent); letter-spacing:1px; margin-bottom:3px;">
+          SESIÓN ${history.length - idx}
+        </div>
+        <div style="font-weight:500; font-size:14px; margin-bottom:2px;">${dateStr}</div>
+        <div style="font-family:'Space Mono',monospace; font-size:10px; color:var(--muted);">
+          ${timeStr} · ${s.entries.length} ejercicios · ${totalSets} series
+        </div>
+      </div>
+      <div style="display:flex; gap:6px; flex-shrink:0;">
+        <button class="btn" style="font-size:9px; padding:5px 10px; border-color:#4fefff; color:#4fefff;" onclick="editSession(${idx})">✎</button>
+        <button class="btn danger" style="font-size:9px; padding:5px 10px;" onclick="deleteSession(${idx})">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function deleteSession(idx) {
+  if (!confirm('¿Eliminar esta sesión?')) return;
+  history.splice(idx, 1);
+  saveData('history', history);
+  renderGlobalStats();
+  populateProgressSelect();
+}
+
+function editSession(idx) {
+  const s = history[idx];
+  if (!s) return;
+  const d = new Date(s.date);
+  const newDateStr = prompt('Editar fecha (DD/MM/AAAA):', d.toLocaleDateString('es-ES'));
+  if (!newDateStr) return;
+  const parts = newDateStr.split('/');
+  if (parts.length !== 3) { alert('Formato incorrecto. Usa DD/MM/AAAA'); return; }
+  const newDate = new Date(+parts[2], +parts[1]-1, +parts[0], d.getHours(), d.getMinutes());
+  if (isNaN(newDate)) { alert('Fecha inválida.'); return; }
+  history[idx].date = newDate.toISOString();
+  history.sort((a, b) => new Date(b.date) - new Date(a.date));
+  saveData('history', history);
+  renderGlobalStats();
+  populateProgressSelect();
 }
 
 function populateProgressSelect() {
@@ -1974,6 +2038,61 @@ function openLightbox(idx) {
   document.getElementById('photoLightbox').classList.add('visible');
 }
 
+function openBodyEdit(id) {
+  const entry = bodyStats.find(e => e.id === id);
+  if (!entry) return;
+  document.getElementById('editBodyId').value = id;
+  document.getElementById('editBDate').value = new Date(entry.date).toISOString().split('T')[0];
+  document.getElementById('editBWeight').value = entry.weight ?? '';
+  document.getElementById('editBWaist').value  = entry.waist  ?? '';
+  document.getElementById('editBChest').value  = entry.chest  ?? '';
+  document.getElementById('editBHip').value    = entry.hip    ?? '';
+  document.getElementById('editBArm').value    = entry.arm    ?? '';
+  document.getElementById('editBThigh').value  = entry.thigh  ?? '';
+  document.getElementById('editBPhotos').value = '';
+  document.getElementById('bodyEditOverlay').style.display = 'flex';
+}
+
+function closeBodyEdit() {
+  document.getElementById('bodyEditOverlay').style.display = 'none';
+}
+
+async function saveBodyEdit() {
+  const id = document.getElementById('editBodyId').value;
+  const idx = bodyStats.findIndex(e => e.id === id);
+  if (idx === -1) return;
+
+  const dateVal = document.getElementById('editBDate').value;
+  const updated = {
+    ...bodyStats[idx],
+    date:   new Date(dateVal + 'T12:00:00').toISOString(),
+    weight: parseFloat(document.getElementById('editBWeight').value) || null,
+    waist:  parseFloat(document.getElementById('editBWaist').value)  || null,
+    chest:  parseFloat(document.getElementById('editBChest').value)  || null,
+    hip:    parseFloat(document.getElementById('editBHip').value)    || null,
+    arm:    parseFloat(document.getElementById('editBArm').value)    || null,
+    thigh:  parseFloat(document.getElementById('editBThigh').value)  || null,
+  };
+
+  // Append new photos if any
+  const files = document.getElementById('editBPhotos').files;
+  if (files.length) {
+    const reads = Array.from(files).map(f => new Promise(res => {
+      const r = new FileReader();
+      r.onload = () => res(r.result);
+      r.readAsDataURL(f);
+    }));
+    const newPhotos = await Promise.all(reads);
+    updated.photos = [...(bodyStats[idx].photos || []), ...newPhotos];
+  }
+
+  await saveBodyStatToDB(updated);
+  bodyStats[idx] = updated;
+  bodyStats.sort((a, b) => new Date(b.date) - new Date(a.date));
+  closeBodyEdit();
+  renderBodySection();
+}
+
 function renderBodyHistory() {
   const container = document.getElementById('bodyHistoryList');
   if (!bodyStats.length) {
@@ -1995,7 +2114,10 @@ function renderBodyHistory() {
     return `<div class="body-entry fade-in">
       <div class="body-entry-date">
         <span>📅 ${dateStr}${photoCount ? ` · 📷 ${photoCount} foto${photoCount>1?'s':''}` : ''}</span>
-        <button class="btn danger" style="font-size:9px;padding:3px 8px;" onclick="deleteBodyStat('${e.id}')">✕</button>
+        <div style="display:flex; gap:6px;">
+          <button class="btn" style="font-size:9px;padding:3px 8px; border-color:#4fefff; color:#4fefff;" onclick="openBodyEdit('${e.id}')">✎</button>
+          <button class="btn danger" style="font-size:9px;padding:3px 8px;" onclick="deleteBodyStat('${e.id}')">✕</button>
+        </div>
       </div>
       <div class="body-measures">${chips || '<span style="color:var(--muted);font-size:11px;">Solo fotos</span>'}</div>
     </div>`;
@@ -2007,6 +2129,52 @@ function renderBodyHistory() {
 // ============================================================
 init();
 </script>
+<!-- BODY STAT EDIT MODAL -->
+<div id="bodyEditOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:400; align-items:center; justify-content:center; padding:20px;">
+  <div style="background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:24px; width:100%; max-width:500px; max-height:90vh; overflow-y:auto;">
+    <h3 style="font-family:'Bebas Neue',sans-serif; font-size:24px; letter-spacing:2px; color:var(--accent); margin-bottom:16px;">✎ EDITAR REGISTRO</h3>
+    <input type="hidden" id="editBodyId">
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Fecha</label>
+        <input type="date" class="form-input" id="editBDate">
+      </div>
+      <div class="form-group">
+        <label>Peso corporal (kg)</label>
+        <input type="number" class="form-input" id="editBWeight" step="0.1" placeholder="75.5">
+      </div>
+      <div class="form-group">
+        <label>Cintura (cm)</label>
+        <input type="number" class="form-input" id="editBWaist" step="0.5">
+      </div>
+      <div class="form-group">
+        <label>Pecho / Espalda (cm)</label>
+        <input type="number" class="form-input" id="editBChest" step="0.5">
+      </div>
+      <div class="form-group">
+        <label>Cadera (cm)</label>
+        <input type="number" class="form-input" id="editBHip" step="0.5">
+      </div>
+      <div class="form-group">
+        <label>Brazo superior (cm)</label>
+        <input type="number" class="form-input" id="editBArm" step="0.5">
+      </div>
+      <div class="form-group">
+        <label>Muslo (cm)</label>
+        <input type="number" class="form-input" id="editBThigh" step="0.5">
+      </div>
+      <div class="form-group full">
+        <label>Añadir fotos (se suman a las existentes)</label>
+        <input type="file" class="form-input" id="editBPhotos" accept="image/*" multiple style="padding:6px;">
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:12px;">
+      <button class="btn primary" style="flex:1;" onclick="saveBodyEdit()">✓ GUARDAR</button>
+      <button class="btn" onclick="closeBodyEdit()">CANCELAR</button>
+    </div>
+  </div>
+</div>
+
 <div class="photo-lightbox" id="photoLightbox" onclick="this.classList.remove('visible')">
   <img id="lightboxImg" src="" alt="Foto progresión">
 </div>
